@@ -92,7 +92,97 @@ var Mock = React.createClass({
         var keyword = $(".searchInput").val().replace(" ", "+");
         var url = "https://api.coursera.org/api/courses.v1?q=search&query=" + keyword + "&includes=instructorIds,partnerIds&fields=instructorIds,partnerIds,instructors.v1(firstName,lastName,suffix),photoUrl";
 
-        $.get(url)
+        $.ajax({
+            url: url,
+            type: "POST",
+            jsonpCallback: 'jsonCallback',
+            contentType: "application/json",
+            dataType: 'jsonp'
+        });
+        var jsonCallback = function (data) {
+                var elements = data.elements,
+                    elementsCount = data.elements.length,
+                    instructors = data.linked["instructors.v1"],
+                    partners = data.linked["partners.v1"];
+                //add new fields into elements - partner names and instructor names
+                for (var i = 0; i < elementsCount; i++) {
+                    var currentElement = elements[i],
+                        elmInstructorsIds = currentElement.instructorIds,
+                        instructorsIdsCount = currentElement.instructorIds.length,
+                        instructorflag = 0;
+                    currentElement.instructorNames = [];
+                    //find instructor names
+                    for (var j = 0; j < instructors.length; j++) {
+                        for (var k = 0; k < instructorsIdsCount; k++) {
+                            if (instructors[j].id == elmInstructorsIds[k]) {
+                                instructorflag++;
+                                var instructorName = instructors[j].firstName + " " + instructors[j].lastName;
+                                currentElement.instructorNames.push(instructorName);
+                            }
+                        }
+                        //limit the instructors to 2 if it has more 
+                        if (instructorflag == instructorsIdsCount || instructorflag == 2) {
+                            break;
+                        }
+
+                        else {
+                            console.log("elem not founs");
+                        }
+                    }
+                    //find partner names
+                    var elmPartnerIds = currentElement.partnerIds,
+                        partnerIdsCount = currentElement.partnerIds.length,
+                        partnerflag = 0;
+                    currentElement.partnerNames = [];
+                    for (var j = 0; j < partners.length; j++) {
+                        for (var k = 0; k < partnerIdsCount; k++) {
+                            if (partners[j].id == elmPartnerIds[k]) {
+                                partnerflag++;
+                                currentElement.partnerNames.push(partners[j].name);
+                                if (partnerflag == partnerIdsCount) {
+                                    break;
+                                }
+                            }
+                        }
+
+                    }
+
+                    currentElement.photoUrl += "?auto=format&dpr=1&w=100&h=100&fit=fill&bg=FFF";
+                }
+                //calculating page numbers
+                var pages = Math.ceil(elementsCount / 10);
+                this.setState({
+                    elements: elements,
+                    numPages: pages
+                });
+                if (this.state.numPages) {
+                    this.loadPage(1);
+                    console.log(data);
+                    //set the page number 
+                    $(".pageNum").val(1);
+                    //stop the loading
+                    $(".contentLoading").addClass("hideContent");
+
+                    $(".pageNav").removeClass("hideContent");
+                    
+                    this.setState({
+                        msg: elementsCount + " matches found"
+                    });
+                    showToastMessage();
+                }
+                else{
+                    this.setState({
+                        msg: "no matches found",
+                        elementsToShow: [ ]
+                    });
+                    showToastMessage();
+                    $(".contentLoading").addClass("hideContent");
+                    $(".pageNav").addClass("hideContent");
+                }
+
+            };
+        /*
+        $.getJSON(url)
             .done(function (data) {
                 var elements = data.elements,
                     elementsCount = data.elements.length,
@@ -176,8 +266,11 @@ var Mock = React.createClass({
 
             }.bind(this))
             .fail(function () {
-
-            });
+                this.setState({
+                    msg: "unable to get data"
+                });
+                showToastMessage();
+            }.bind(this));*/
     },
     searchEnter: function (e) {
         if (e.keyCode == 13) {
